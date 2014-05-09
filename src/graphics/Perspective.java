@@ -30,11 +30,15 @@ public class Perspective extends JFrame{
 	private Object3D selectedObject;
 
 
-	public Perspective(WorldBuilder wb, World world, CellManager cellManager, boolean isSteveMode) {
-		setSize(800, 600);
+	public Perspective(WorldBuilder wb, World world, CellManager cellManager) {
+		setSize(windowx, windowy);
 		setVisible(true);
+		setLocationRelativeTo(null);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
+		setTitle("The Game of Life - 3D");
+		getFocusableWindowState();
+		setLayout(null);
+		
 		this.wb = wb;
 		this.world = world;
 
@@ -46,9 +50,37 @@ public class Perspective extends JFrame{
 			loop();
 		} catch (Exception e) {
 			e.printStackTrace();
-			// What problems could occur and how should we communicate this?
 		}
 	}
+	
+	private void initBuffer(){
+		buffer = new FrameBuffer(windowx, windowy, FrameBuffer.SAMPLINGMODE_HARDWARE_ONLY																																																																																																																																																																											);
+		buffer.optimizeBufferAccess();
+		buffer.disableRenderer(IRenderer.RENDERER_SOFTWARE);
+		buffer.enableRenderer(IRenderer.RENDERER_OPENGL);
+	}
+
+	private void initCanvas(){
+		canvas = new Canvas();
+		canvas.setVisible(true);
+		canvas = buffer.enableGLCanvasRenderer();
+		this.add(canvas);
+	}
+	
+	private void initPauseMenu(){
+		this.pauseMenu = new PauseMenu(this);
+		this.pauseMenu.setVisible(true);
+		this.paused = false;
+		this.add(pauseMenu);
+		pauseMenu.setBounds(this.getWidth()/2,
+                this.getHeight()/2,
+                this.getWidth()/2,
+                this.getHeight()/2);
+	}
+	
+	private void initCamera() {
+		this.steveCamera = new SteveCamera(world);
+		this.godCamera = new GodCamera(world);
 
 	private void initCamera(boolean isSteveMode, CellManager cellManager) {
 		if (isSteveMode) 	{this.camera = new SteveCamera(world);}
@@ -89,9 +121,26 @@ public class Perspective extends JFrame{
 		System.exit(0);
 	}
 
+	public void changeSpeed(int speed){
+		this.delay = speed;
+	}
 	
+	public void toggleCamera(){
+		if(camera.equals(godCamera)){
+			world.setCameraTo(steveCamera);
+			camera = steveCamera;
+		} else {
+			world.setCameraTo(godCamera);
+			camera = godCamera;
+		}
+	}
 	
-	
+	public void togglePause(){
+		toggleCursor();
+		paused = !paused;
+		canvas.setVisible(!canvas.isVisible());
+	}
+
 
 	public void toggleCursor(){
 		if(this.showCursor == false){
@@ -102,13 +151,14 @@ public class Perspective extends JFrame{
 			showCursor = false;
 			hideCursor();
 		}
-		mh.toggleListener();
+		mh.toggleMouseMovement();
 	}
 	public void hideCursor(){
 		BufferedImage cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
 		Cursor blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(cursorImg, new Point(0, 0), "blank cursor");
 		getContentPane().setCursor(blankCursor);
 	}
+
 	public void showCursor(){
 		getContentPane().setCursor(Cursor.getDefaultCursor());
 	}
@@ -116,8 +166,7 @@ public class Perspective extends JFrame{
 	public int selectPointedObject(){
 		SimpleVector ray = Interact2D.reproject2D3DWS(camera, buffer, this.getWidth()/2, this.getHeight()/2).normalize(); 
 		Object[] res = world.calcMinDistanceAndObject3D(camera.getPosition(), ray, 10000F);
-		if (res==null || res[1] == null || res[0] == (Object)Object3D.RAY_MISSES_BOX) { 
-			System.out.println("Did not click an object");
+		if (res == null || res[1] == null || res[0] == (Object)Object3D.RAY_MISSES_BOX) { 
 			selectedObject = null;
 			return -1;
 		}
